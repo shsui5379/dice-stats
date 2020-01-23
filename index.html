@@ -1,0 +1,464 @@
+<!doctype html>
+    <html>
+        <head>
+            <title>Row Row Row Your Dice</title>
+            <style>
+                #title
+                {
+                    font: bold 50pt "MQ";
+                    text-align: center;
+                }
+                body
+                {
+                    font: 18pt Tw Cen MT;
+                    background-color: #ffbd38;
+                }
+                button
+                {
+                    font: 18pt Tw Cen MT;
+                    background-color: #94bdff;
+                }
+                #message
+                {
+                    color: red;
+                    font: 18pt Tw Cen MT;
+                }
+                @font-face
+                {
+                    font-family: MQ;
+                    src: url(https://fonts.gstatic.com/s/mysteryquest/v7/-nF6OG414u0E6k0wynSGlujRLwYvDg.woff2);
+                }
+                input
+                {
+                    background-color: #b3e5fc;
+                    padding: 5px;
+                }
+                .ui
+                {
+                    display: grid;
+                    grid-template-columns: auto auto;
+                    gap: 20px;
+                }
+                #reset
+                {
+                    text-align: center;
+                }
+                table, td
+                {
+                    border: thin solid black;
+                    border-collapse: collapse;
+                    text-align: center;
+                    background-color: #b3e5fc;
+                }
+                th
+                {
+                    font-family: MQ;
+                }
+            </style>
+            <script>
+                function initialize()
+                {
+                    controls = document.getElementById("controlsIn");
+                    msgOut = document.getElementById("message");
+                    inBox = document.getElementById("box");
+                    currentSet = document.getElementById("currentTable");
+                    singleData = document.getElementById("singleTable");
+                    doubleData = document.getElementById("doubleTable");
+                    tripleData = document.getElementById("tripleTable");
+
+                    clearTables();
+
+                    resetButton = document.getElementById("reset");  //hides reset button and data tables until they're needed
+                    resetButton.style.display = "none";
+                    main.style.display = "none";
+
+                    currentHead = document.getElementById("current");
+                    singleHead = document.getElementById("single");
+                    doubleHead = document.getElementById("double");
+                    tripleHead = document.getElementById("triple");
+
+                    historyData1 = [];
+                    historyMean1 = 0;
+                    historyMedian1 = 0;
+                    historyMode1 = "";
+                    historyFreq1 = [];
+
+                    historyData2 = [];
+                    historyDouble = 0;
+                    historyMean2 = 0;
+                    historyMedian2 = 0;
+                    historyMode2 = "";
+                    historyFreq2 = [];
+
+                    historyData3 = [];
+                    historyDouble3 = 0; 
+                    historyTriple = 0;
+                    historyMean3 = 0;
+                    historyMedian3 = 0;
+                    historyMode3 = "";
+                    historyFreq3 = [];
+                }
+                function clearTables() //clear table by iterating the rows
+                {
+                    var tables = [currentSet, singleData, doubleData, tripleData];
+                    for (var t of tables)
+                    {
+                        var toDelete = t.rows.length - 1;
+                        for (var i = 1; i < toDelete; i++)
+                        {
+                            t.deleteRow(t.rows.length - 1);
+                        }
+                    }
+                }
+                function collectData()
+                {
+                    notice = "";
+                    inBox.style.borderColor = "black";
+                    inBox.style.borderWidth = "2px";
+                    inBox.style.backgroundColor = "#b3e5fc";
+                    display();
+                    numDice = controls.numDicesIn.value;   //collect number of dices to roll from form
+                    numRolls = controls.numRollsIn.value;  //collect number of time to roll from form
+                    if (Number.isInteger(numRolls * 1) && numRolls > 0)  //verify that number of rolls is a positive integer, and that a number of dice has before proceeding
+                    {
+                       roll();
+                    }
+                    else
+                    {
+                        if (numDice == 1 || numDice == 2 || numDice == 3)
+                        {
+                            notice = "<b>The number of rolls has to be a positive whole number.  Please try again</b>";
+                        }
+                        else
+                        {
+                            notice = "<b>Please select a number of dice to roll.</b>";
+                        }
+                        display();
+                        inBox.style.borderColor = "red";
+                        inBox.style.borderWidth = "5px";
+                        inBox.style.backgroundColor = "rgb(255, 131, 131)";
+                    }
+                }
+                function display() //updates error msg
+                {
+                    msgOut.innerHTML = notice;
+                }
+                function arraySum(list)  //sums an array through iteration
+                {
+                    var currentSum = 0;
+                    for (var i of list)
+                    {
+                        currentSum += i;
+                    }
+                    return currentSum;
+                }
+                function roll()
+                {
+                    clearTables();
+                    resetButton.style.display = "block";  //display reset button and data tables
+                    main.style.display = "grid";
+                    var dump = [];
+                    currentData = [];
+                    currentDupes = 0;
+                    currentDupes3 = 0;
+                    for(var i = 0; i < (numDice * numRolls); i++)  //creates an array of random numbers
+                    {
+                        dump.push(randomInteger(1, 6)); 
+                    }
+                    console.log("raw: " + dump);
+                    while (dump.length > 0)
+                    {
+                        var toSum = [];
+                        for (var i of dump.splice(0, numDice))
+                        {
+                            toSum.push(i);
+                        }
+                        console.log(toSum);
+                        currentData.push(arraySum(toSum)); //store data for the set
+                        if (numDice == 2)            //calculate statistics
+                        {
+                            currentDupes += calcDupes(toSum, 2);
+                        }
+                        else if (numDice == 3)
+                        {
+                            currentDupes3 += calcDupes(toSum, 3);
+                            currentDupes += calcDupes(toSum, 2);
+                        }
+                    }
+                    currentFreq = calcFreq(currentData);
+                    currentMean = calcMean(currentData);
+                    currentMedian = calcMedian(currentData);
+                    currentMode = calcMode(currentFreq);
+                    directingPackup();
+                }
+                function calcDupes(set, toMatch)
+                {
+                    var outDupes = 0;
+                    var temp = set[0];
+                    var counter = 0;
+                    for (var e in set)
+                    {                //doubles/triples detection by comparison
+                        var x = parseInt(e);
+                        if ((set[x] == set[x-1] || set[x] == set[x+1]) || (x == 0 || x == 2) && set[0] == set[2])
+                        {
+                            counter++;
+                        }
+                    }
+                    if (counter >= toMatch)
+                    {
+                        outDupes++;
+                    }
+                    return outDupes;
+                }
+                function calcFreq(set)  //calculates frequency of each outcome by comparison
+                {
+                    var outFreq = [];
+                    for (var i = 0; i <= (numDice * 6); i++)
+                    {
+                        var count = 0;
+                        for (var item of set)
+                        {
+                            if (item == i)
+                            {
+                                count++;
+                            }
+                        }
+                        outFreq.push(count);
+                    }
+                    return outFreq;
+                }
+                function calcMean(set)  //sum array then divide by num of elements
+                {
+                    return (arraySum(set) / set.length).toFixed(2);
+                }
+                function calcMedian(set)  //sort numbers first, then find middle value.  Average 2 middle values if even number of elements
+                {
+                    var outMedian = 0;
+                    set.sort(function(a, b) {return a-b});
+                    if (set.length % 2 == 0)  //even lists
+                    {
+                        var first = set[set.length / 2];
+                        var second = set[set.length / 2 - 1];
+                        outMedian = (first + second) / 2;
+                    }
+                    else //odd lists
+                    {
+                        outMedian = set[Math.floor(set.length / 2)];
+                    }
+                    return outMedian;
+                }
+                function calcMode(freqs) //check position of hightest number in list by iteration
+                {
+                    var outMode = "";
+                    var mode = 0;
+                    for (var num in freqs)
+                    {
+                        if (freqs[num] > freqs[mode])
+                        {
+                            mode = num;
+                        }
+                    }
+                    for (var num in freqs) //checks for multiple modes
+                    {
+                        if (freqs[num] == freqs[mode])
+                        {
+                            outMode += num;
+                            outMode += " ";
+                        }
+                    }
+                    return outMode;
+                }
+                function randomInteger(lower, upper)  //random number generator
+                {
+                    var multiplier = upper - lower + 1;
+                    var rnd = Math.floor((Math.random() * multiplier) + lower);
+                    return rnd;
+                }
+                function directingPackup(data) //stores data into history and recalc
+                {
+                    switch(true)
+                    {
+                        case numDice == 1:
+                        packup(historyData1);
+                        historyFreq1 = calcFreq(historyData1);
+                        historyMean1 = calcMean(historyData1);
+                        historyMedian1 = calcMedian(historyData1);
+                        historyMode1 = calcMode(historyFreq1);
+                        break;
+                        case numDice == 2:
+                        packup(historyData2);
+                        historyFreq2 = calcFreq(historyData2);
+                        historyMean2 = calcMean(historyData2);
+                        historyMedian2 = calcMedian(historyData2);
+                        historyMode2 = calcMode(historyFreq2);
+                        break;
+                        case numDice == 3:
+                        packup(historyData3);
+                        historyFreq3 = calcFreq(historyData3);
+                        historyMean3 = calcMean(historyData3);
+                        historyMedian3 = calcMedian(historyData3);
+                        historyMode3 = calcMode(historyFreq3);
+                        break;
+                    }
+                    preDisplay();
+                }
+                function packup(data)  //stores data to corresponding history array
+                {
+                    for (var item of currentData)
+                    {
+                        data.push(item);
+                    }
+                    if (numDice == 2)
+                        {
+                            historyDouble += currentDupes;
+                        }
+                        else if (numDice == 3)
+                        {
+                            historyDouble3 += currentDupes;
+                            historyTriple += currentDupes3;
+                        }
+                }
+                function preDisplay()  //prepare data to be displayed by table
+                {
+                    currentSet.freq = currentFreq;
+                    currentSet.mean = currentMean;
+                    currentSet.median = currentMedian;
+                    currentSet.mode = currentMode;
+                    currentSet.dupes = currentDupes;
+                    currentSet.dupes3 = currentDupes3;
+
+                    singleData.freq = historyFreq1;
+                    singleData.mean = historyMean1;
+                    singleData.median = historyMedian1;
+                    singleData.mode = historyMode1;
+                    singleData.dupes = 0;
+                    singleData.dupes3 = 0;
+
+                    doubleData.freq = historyFreq2;
+                    doubleData.mean = historyMean2;
+                    doubleData.median = historyMedian2;
+                    doubleData.mode = historyMode2;
+                    doubleData.dupes = historyDouble;
+                    doubleData.dupes3 = 0;
+
+                    tripleData.freq = historyFreq3;
+                    tripleData.mean = historyMean3;
+                    tripleData.median = historyMedian3;
+                    tripleData.mode = historyMode3;
+                    tripleData.dupes = historyDouble3;
+                    tripleData.dupes3 = historyTriple;
+
+                    //debug tools
+                    console.log("current: " + currentData);
+                    console.log("1: " + historyData1);
+                    console.log("2: " + historyData2);
+                    console.log("3: " + historyData3);
+
+                    displayTable();
+                }
+                function displayTable() //updates table
+                {
+                    var allTables = [currentSet, singleData, doubleData, tripleData];
+                    var calculations = ["mean", "median", "mode"]
+                    for (var table of allTables)
+                    {
+                        var newRow = table.insertRow();
+                        var start = 0;
+                        switch (true) { //starts
+                            case historyFreq1 === table.freq:
+                                start = 1;
+                                break;
+                            case historyFreq2 === table.freq:
+                                start = 2;
+                                break;
+                            case historyFreq3 === table.freq:
+                                start = 3;
+                                break;
+                            default:
+                                start = parseInt(numDice);
+                                break;
+                        }
+                        for (var point in table.freq) //freqs
+                        {
+                            if (point >= start)
+                            {
+                                newRow = table.insertRow();
+                                var newCell = newRow.insertCell();
+                                newCell.innerHTML = point;
+                                newCell = newRow.insertCell();
+                                newCell.innerHTML = table.freq[point];
+                            }
+                        }
+                        var calcValues = [table.mean, table.median, table.mode]; //stats
+                        for (var calcs in calcValues)
+                        {
+                            newRow = table.insertRow();
+                            newCell = newRow.insertCell();
+                            newCell.innerHTML = calculations[calcs];
+                            newCell = newRow.insertCell();
+                            newCell.innerHTML = calcValues[calcs];
+                        }
+                        if ((table.freq !== historyFreq1) && !(table.freq === currentFreq && numDice == 1))
+                        {
+                            newRow = table.insertRow();
+                            newCell = newRow.insertCell();
+                            newCell.innerHTML = "doubles";
+                            newCell = newRow.insertCell();
+                            newCell.innerHTML = table.dupes;
+                            if ((table.freq === historyFreq3)||(table.freq === currentFreq && numDice == 3))
+                            {
+                                newRow = table.insertRow();
+                                newCell = newRow.insertCell();
+                                newCell.innerHTML = "triples";
+                                newCell = newRow.insertCell();
+                                newCell.innerHTML = table.dupes3;
+                            }
+                        }
+                    }
+                }
+            </script>
+        </head>
+        <body onload = "initialize();">
+            <div id = "title">Row Row Row Your Dice</div>
+            </br>
+            <form id = controlsIn>
+                <!-- radios to choose from 1, 2, or 3 dices -->
+                <label>
+                    <input name = "numDicesIn" type = "radio" value = 1 /> One die
+                </label>
+                <label>
+                    <input name = "numDicesIn" type = "radio" value = 2 /> Two dices
+                </label>
+                <label>
+                    <input name = "numDicesIn" type = "radio" value = 3 /> Three dices
+                </label>
+                </br></br>
+                <label>
+                    Number of rolls: <input id = "box" name = "numRollsIn" type = "text" />
+                </label>
+            </form>
+            </br>
+            <div>
+                <button onclick = "collectData();">Roll</button>
+                <span id = "message"></span>
+            </div>
+            </br>
+            <!-- tables in a grid -->
+            <div class = "ui" id = "main">
+                <table id = "currentTable">
+                    <tr><th colspan = "2">Current Dice Data</th></tr>
+                </table>
+                <table id = "singleTable">
+                    <tr><th colspan = "2">Single Dice History</th></tr>
+                </table>
+                <table id = "doubleTable">
+                    <tr><th colspan = "2">Double Dice History</th></tr>
+                </table>
+                <table id = "tripleTable">
+                    <tr><th colspan = "2">Triple Dice History</th></tr>
+                </table>
+            </div>
+            </br>
+            <div id = "reset"><button onclick = "initialize();">Reset</button></div>
+        </body>
+    </html>
